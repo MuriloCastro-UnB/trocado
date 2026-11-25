@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block titulo %}Chat{% endblock %}
+{% block conteudo %}
+<h1>Chat</h1>
+<p class="dica">Escreva um gasto ou uma entrada, como "gastei 35 no ifood" ou "recebi 800 da bolsa".
+Você também pode perguntar: "qual meu saldo?", "quanto gastei com transporte esse mês?" ou "como estão minhas metas?".</p>
+
+{% if frase %}
+  <div class="balao usuario">{{ frase }}</div>
+{% endif %}
+
+{% if resposta %}
+  <div class="balao sistema resposta">{{ resposta }}</div>
+{% endif %}
+
+{% if confirmacao %}
+  <div class="balao sistema">
+    <p>{{ confirmacao.texto }}</p>
+    <form method="post" action="{{ url_for('confirmar') }}">
+      <input type="hidden" name="tipo" value="{{ confirmacao.tipo }}">
+      <input type="hidden" name="valor" value="{{ confirmacao.valor }}">
+      <input type="hidden" name="data" value="{{ confirmacao.data }}">
+      <input type="hidden" name="descricao" value="{{ confirmacao.descricao }}">
+      {% if confirmacao.tipo == "gasto" %}
+        <label>Categoria
+          <select name="categoria">
+            {% for categoria in categorias %}
+              <option value="{{ categoria }}" {% if categoria == confirmacao.categoria %}selected{% endif %}>{{ categoria | categoria }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      {% else %}
+        <input type="hidden" name="categoria" value="entrada">
+      {% endif %}
+      <div class="botoes">
+        <button type="submit" name="acao" value="confirmar">Confirmar</button>
+        <button type="submit" name="acao" value="cancelar" class="secundario">Cancelar</button>
+      </div>
+    </form>
+  </div>
+{% endif %}
+
+<form method="post" action="{{ url_for('chat') }}" class="linha">
+  <input type="text" name="mensagem" placeholder="Ex.: paguei 12,50 de uber ontem" autocomplete="off" autofocus>
+  <button type="submit">Enviar</button>
+</form>
+
+<h2>Últimos registros</h2>
+{% if ultimas %}
+  <div class="tabela">
+    <table>
+      <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th class="numero">Valor</th></tr>
+      {% for transacao in ultimas %}
+        <tr>
+          <td>{{ transacao.data | data }}</td>
+          <td>{{ transacao.descricao }}</td>
+          <td>{{ transacao.categoria | categoria }}</td>
+          <td class="numero {{ transacao.tipo }}">{% if transacao.tipo == "entrada" %}+{% else %}-{% endif %} {{ transacao.valor | reais }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+{% else %}
+  <p class="vazio">Nenhum registro ainda.</p>
+{% endif %}
+{% endblock %}

@@ -168,6 +168,9 @@ def progresso_meta(meta, hoje):
     if falta % meses != 0:
         por_mes = por_mes + 1
 
+    # o prazo passou e ainda falta dinheiro
+    vencida = date.fromisoformat(meta["prazo"]) < hoje and falta > 0
+
     return {
         "id": meta["id"],
         "nome": meta["nome"],
@@ -179,6 +182,7 @@ def progresso_meta(meta, hoje):
         "meses_restantes": meses,
         "por_mes": por_mes,
         "concluida": falta == 0,
+        "vencida": vencida,
     }
 
 
@@ -229,6 +233,31 @@ def adicionar_transacao(dados, tipo, valor, categoria, descricao, data):
     }
     dados["transacoes"].append(transacao)
     return transacao
+
+
+def data_da_transacao(transacao):
+    return transacao["data"]
+
+
+def transacoes_do_mes(dados, mes):
+    lista = []
+    for transacao in dados["transacoes"]:
+        if transacao["data"].startswith(mes):
+            lista.append(transacao)
+    # ordena pela data, da mais nova para a mais antiga
+    lista.sort(key=data_da_transacao, reverse=True)
+    return lista
+
+
+def meses_com_registros(dados, mes_atual):
+    # lista de meses para o seletor do resumo, do mais novo para o mais antigo
+    meses = [mes_atual]
+    for transacao in dados["transacoes"]:
+        mes = transacao["data"][0:7]
+        if mes not in meses:
+            meses.append(mes)
+    meses.sort(reverse=True)
+    return meses
 
 
 def excluir_transacao(dados, id_transacao):

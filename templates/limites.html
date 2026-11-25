@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}Limites{% endblock %}
+{% block conteudo %}
+<h1>Limites de {{ mes | nome_mes }}</h1>
+<p class="dica">Você recebe um aviso quando passa de 80% do limite e quando estoura.</p>
+
+{% include "tabela_limites.html" %}
+
+<h2>Definir limite</h2>
+<form method="post" action="{{ url_for('salvar_limite') }}" class="cartao formulario">
+  <label>Categoria
+    <select name="categoria">
+      {% for categoria in categorias %}
+        <option value="{{ categoria }}">{{ categoria | categoria }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Limite por mês (R$)
+    <input type="text" name="valor" placeholder="Ex.: 500 ou 500,00" inputmode="decimal">
+  </label>
+  <button type="submit">Salvar limite</button>
+  <p class="dica">Para tirar o limite de uma categoria, salve o valor 0.</p>
+</form>
+{% endblock %}

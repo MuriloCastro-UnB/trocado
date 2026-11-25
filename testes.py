@@ -1,9 +1,12 @@
 import os
-from datetime import date
+import shutil
+import tempfile
+from datetime import date, timedelta
 
 import armazenamento
 import financas
 import interpretador
+from app import app
 
 # data fixa para os testes não dependerem do dia em que forem rodados
 HOJE = date(2026, 11, 25)
@@ -238,39 +241,195 @@ def testar_alteracoes():
     print("Adicionar, excluir e limites: ok")
 
 
-def testar_armazenamento():
-    pasta_dados = os.path.join(armazenamento.PASTA, "dados")
-
+def testar_armazenamento(pasta_temporaria):
     # arquivo corrompido: não pode travar, volta com dados vazios
-    # e guarda uma cópia do arquivo quebrado em teste_quebrado_corrompido.json
-    quebrado = os.path.join(pasta_dados, "teste_quebrado.json")
-    copia = os.path.join(pasta_dados, "teste_quebrado_corrompido.json")
+    # e guarda uma cópia do arquivo quebrado em quebrado_corrompido.json
+    quebrado = os.path.join(pasta_temporaria, "quebrado.json")
     with open(quebrado, "w", encoding="utf-8") as arquivo:
         arquivo.write("{ isso não é json")
     dados = armazenamento.carregar_dados(quebrado)
-    with open(copia, "r", encoding="utf-8") as arquivo:
-        conteudo_copia = arquivo.read()
-    os.remove(quebrado)
-    os.remove(copia)
     assert dados == {"transacoes": [], "limites": {}, "metas": []}
-    assert conteudo_copia == "{ isso não é json"
+    with open(os.path.join(pasta_temporaria, "quebrado_corrompido.json"), "r", encoding="utf-8") as arquivo:
+        assert arquivo.read() == "{ isso não é json"
 
-    # arquivo que não existe: é criado a partir do exemplo
-    novo = os.path.join(pasta_dados, "teste_novo.json")
+    # arquivo que não existe: é criado a partir do exemplo, já no mês atual
+    novo = os.path.join(pasta_temporaria, "novo.json")
     dados = armazenamento.carregar_dados(novo)
-    criou = os.path.exists(novo)
-    os.remove(novo)
-    assert criou
+    assert os.path.exists(novo)
     assert len(dados["transacoes"]) == 15
+    mes_atual = financas.mes_de(date.today())
+    for transacao in dados["transacoes"]:
+        assert transacao["data"].startswith(mes_atual)
+        assert transacao["data"] <= date.today().isoformat()
 
     # salvar e carregar de novo devolve a mesma coisa
-    salvo = os.path.join(pasta_dados, "teste_salvo.json")
+    salvo = os.path.join(pasta_temporaria, "salvo.json")
     armazenamento.salvar_dados(criar_dados_teste(), salvo)
-    dados = armazenamento.carregar_dados(salvo)
-    os.remove(salvo)
-    assert dados == criar_dados_teste()
+    assert armazenamento.carregar_dados(salvo) == criar_dados_teste()
     print("Armazenamento: ok")
 
+
+def testar_mes_atual():
+    # em 10/12/2026: o dia 05 continua 05, o dia 24 vira 10 (não pode passar de hoje)
+    dados = {"transacoes": [{"data": "2026-11-05"}, {"data": "2026-11-24"}]}
+    armazenamento.trazer_para_o_mes_atual(dados, date(2026, 12, 10))
+    assert dados["transacoes"][0]["data"] == "2026-12-05"
+    assert dados["transacoes"][1]["data"] == "2026-12-10"
+    print("Exemplo no mês atual: ok")
+
+
+def pagina(resposta):
+    # o texto HTML que a rota devolveu
+    assert resposta.status_code == 200
+    return resposta.get_data(as_text=True)
+
+
+def testar_rotas(pasta_temporaria):
+    # o site usa um arquivo na pasta temporária, nunca o dados/trocado.json
+    arquivo = os.path.join(pasta_temporaria, "trocado.json")
+    app.config["ARQUIVO_DADOS"] = arquivo
+    app.config["TESTING"] = True
+    cliente = app.test_client()
+    hoje = date.today().isoformat()
+
+    # cada página abre (e a primeira cria o arquivo a partir do exemplo)
+    assert "Chat" in pagina(cliente.get("/"))
+    assert "gastei 35 no ifood" in pagina(cliente.get("/transacoes"))
+    assert "Alimentação" in pagina(cliente.get("/limites"))
+    assert "Viagem" in pagina(cliente.get("/metas"))
+    assert "Entradas" in pagina(cliente.get("/resumo"))
+    assert len(armazenamento.carregar_dados(arquivo)["transacoes"]) == 15
+
+    # frase: mostra a confirmação, mas ainda não salva
+    texto = pagina(cliente.post("/", data={"mensagem": "gastei 35 no ifood"}))
+    assert "Entendi: gasto de R$ 35,00 em Alimentação, hoje. Confirmar?" in texto
+    assert 'name="valor" value="3500"' in texto
+    assert len(armazenamento.carregar_dados(arquivo)["transacoes"]) == 15
+
+    # confirmar trocando a categoria para lazer: lazer tinha 30 de 50, agora 65 de 50
+    formulario = {"acao": "confirmar", "tipo": "gasto", "valor": "3500", "categoria": "lazer",
+                  "data": hoje, "descricao": "gastei 35 no ifood"}
+    texto = pagina(cliente.post("/confirmar", data=formulario, follow_redirects=True))
+    assert "Registro salvo: gasto de R$ 35,00 em Lazer" in texto
+    assert "passou do limite de Lazer" in texto
+    dados = armazenamento.carregar_dados(arquivo)
+    assert len(dados["transacoes"]) == 16
+    assert dados["transacoes"][-1]["categoria"] == "lazer"
+    assert dados["transacoes"][-1]["valor"] == 3500
+
+    # entrada sempre fica com a categoria entrada
+    formulario = {"acao": "confirmar", "tipo": "entrada", "valor": "80000", "categoria": "lazer",
+                  "data": hoje, "descricao": "recebi 800 da bolsa"}
+    texto = pagina(cliente.post("/confirmar", data=formulario, follow_redirects=True))
+    assert "Registro salvo: entrada de R$ 800,00" in texto
+    assert armazenamento.carregar_dados(arquivo)["transacoes"][-1]["categoria"] == "entrada"
+
+    # cancelar não salva
+    formulario = {"acao": "cancelar", "tipo": "gasto", "valor": "3500", "categoria": "lazer",
+                  "data": hoje, "descricao": "gastei 35 no ifood"}
+    assert "cancelado" in pagina(cliente.post("/confirmar", data=formulario, follow_redirects=True))
+    assert len(armazenamento.carregar_dados(arquivo)["transacoes"]) == 17
+
+    # perguntas
+    assert "Seu saldo do mês é" in pagina(cliente.post("/", data={"mensagem": "qual meu saldo?"}))
+    assert "com Transporte" in pagina(cliente.post("/", data={"mensagem": "quanto gastei com transporte esse mês?"}))
+
+    # erros no chat
+    assert "Não encontrei o valor" in pagina(cliente.post("/", data={"mensagem": "gastei no mercado"}))
+    assert "maior que zero" in pagina(cliente.post("/", data={"mensagem": "paguei 0 de uber"}))
+    assert "Escreva uma mensagem" in pagina(cliente.post("/", data={"mensagem": "   "}))
+
+    # campos escondidos alterados: nada é salvo
+    errados = [
+        [{"tipo": "presente", "valor": "3500", "categoria": "lazer", "data": hoje}, "Tipo inválido"],
+        [{"tipo": "gasto", "valor": "abc", "categoria": "lazer", "data": hoje}, "Valor inválido"],
+        [{"tipo": "gasto", "valor": "-5", "categoria": "lazer", "data": hoje}, "Valor inválido"],
+        [{"tipo": "gasto", "valor": "3500", "categoria": "viagem", "data": hoje}, "categoria válida"],
+        [{"tipo": "gasto", "valor": "3500", "categoria": "lazer", "data": "2026-13-01"}, "Data inválida"],
+    ]
+    for item in errados:
+        formulario = item[0]
+        formulario["acao"] = "confirmar"
+        assert item[1] in pagina(cliente.post("/confirmar", data=formulario))
+    assert len(armazenamento.carregar_dados(arquivo)["transacoes"]) == 17
+
+    # limites: "500,00" e "500" valem R$ 500,00; 0 tira o limite
+    texto = pagina(cliente.post("/limites/definir", data={"categoria": "saude", "valor": "500,00"}, follow_redirects=True))
+    assert "Limite de Saúde definido em R$ 500,00" in texto
+    assert armazenamento.carregar_dados(arquivo)["limites"]["saude"] == 50000
+    pagina(cliente.post("/limites/definir", data={"categoria": "moradia", "valor": "500"}, follow_redirects=True))
+    assert armazenamento.carregar_dados(arquivo)["limites"]["moradia"] == 50000
+    texto = pagina(cliente.post("/limites/definir", data={"categoria": "saude", "valor": "0"}, follow_redirects=True))
+    assert "Limite de Saúde removido" in texto
+    assert "saude" not in armazenamento.carregar_dados(arquivo)["limites"]
+
+    assert "Digite um valor" in pagina(cliente.post("/limites/definir", data={"categoria": "lazer", "valor": ""}))
+    assert "negativo" in pagina(cliente.post("/limites/definir", data={"categoria": "lazer", "valor": "-50"}))
+    assert "Valor inválido" in pagina(cliente.post("/limites/definir", data={"categoria": "lazer", "valor": "abc"}))
+    assert "categoria válida" in pagina(cliente.post("/limites/definir", data={"categoria": "viagem", "valor": "50"}))
+    assert armazenamento.carregar_dados(arquivo)["limites"]["lazer"] == 5000
+
+    # metas: criar e guardar dinheiro
+    prazo = (date.today() + timedelta(days=90)).isoformat()
+    texto = pagina(cliente.post("/metas/criar", data={"nome": "Show", "valor": "300", "prazo": prazo}, follow_redirects=True))
+    assert "Meta Show criada" in texto
+    meta = armazenamento.carregar_dados(arquivo)["metas"][-1]
+    assert meta == {"id": 3, "nome": "Show", "alvo": 30000, "guardado": 0, "prazo": prazo}
+
+    texto = pagina(cliente.post("/metas/guardar", data={"id": "3", "valor": "100"}, follow_redirects=True))
+    assert "R$ 100,00 guardados na meta Show" in texto
+    assert armazenamento.carregar_dados(arquivo)["metas"][-1]["guardado"] == 10000
+    texto = pagina(cliente.post("/metas/guardar", data={"id": "3", "valor": "200,00"}, follow_redirects=True))
+    assert "completou a meta" in texto
+
+    ontem = (date.today() - timedelta(days=1)).isoformat()
+    assert "nome da meta" in pagina(cliente.post("/metas/criar", data={"nome": "  ", "valor": "300", "prazo": prazo}))
+    assert "maior que zero" in pagina(cliente.post("/metas/criar", data={"nome": "Show", "valor": "0", "prazo": prazo}))
+    assert "Valor inválido" in pagina(cliente.post("/metas/criar", data={"nome": "Show", "valor": "trezentos", "prazo": prazo}))
+    assert "prazo válido" in pagina(cliente.post("/metas/criar", data={"nome": "Show", "valor": "300", "prazo": "2026-02-30"}))
+    assert "prazo válido" in pagina(cliente.post("/metas/criar", data={"nome": "Show", "valor": "300", "prazo": ""}))
+    assert "depois de hoje" in pagina(cliente.post("/metas/criar", data={"nome": "Show", "valor": "300", "prazo": ontem}))
+    assert "não existe" in pagina(cliente.post("/metas/guardar", data={"id": "99", "valor": "100"}))
+    assert "Meta inválida" in pagina(cliente.post("/metas/guardar", data={"id": "abc", "valor": "100"}))
+    assert "negativo" in pagina(cliente.post("/metas/guardar", data={"id": "1", "valor": "-10"}))
+    assert "maior que zero" in pagina(cliente.post("/metas/guardar", data={"id": "1", "valor": "0"}))
+    assert len(armazenamento.carregar_dados(arquivo)["metas"]) == 3
+
+    # meta com prazo vencido mostra "Prazo vencido"
+    dados = armazenamento.carregar_dados(arquivo)
+    dados["metas"].append({"id": 4, "nome": "Atrasada", "alvo": 50000, "guardado": 1000, "prazo": "2026-01-01"})
+    armazenamento.salvar_dados(dados, arquivo)
+    assert "Prazo vencido" in pagina(cliente.get("/metas"))
+
+    # excluir
+    texto = pagina(cliente.post("/excluir", data={"id": "16"}, follow_redirects=True))
+    assert "Registro excluído" in texto
+    assert len(armazenamento.carregar_dados(arquivo)["transacoes"]) == 16
+    assert "não existe" in pagina(cliente.post("/excluir", data={"id": "16"}))
+    assert "Registro inválido" in pagina(cliente.post("/excluir", data={"id": "abc"}))
+
+    # resumo com seletor de mês
+    mes_atual = financas.mes_de(date.today())
+    assert financas.nome_mes(mes_atual) in pagina(cliente.get("/resumo?mes=" + mes_atual))
+    assert "janeiro de 2025" in pagina(cliente.get("/resumo?mes=2025-01"))
+    assert "Mês inválido" in pagina(cliente.get("/resumo?mes=abc"))
+    assert "Mês inválido" in pagina(cliente.get("/resumo?mes=2026-13"))
+    print("Rotas: ok")
+
+
+def conteudo_da_pasta_dados():
+    # nome e conteúdo de cada arquivo, para ver se os testes mudaram alguma coisa
+    pasta = os.path.join(armazenamento.PASTA, "dados")
+    conteudo = {}
+    for nome in os.listdir(pasta):
+        with open(os.path.join(pasta, nome), "rb") as arquivo:
+            conteudo[nome] = arquivo.read()
+    return conteudo
+
+
+# os testes usam uma pasta temporária, que é apagada no final
+antes = conteudo_da_pasta_dados()
+pasta_temporaria = tempfile.mkdtemp()
 
 testar_valores()
 testar_interpretador()
@@ -280,6 +439,12 @@ testar_formatacao()
 testar_calculos()
 testar_metas()
 testar_alteracoes()
-testar_armazenamento()
+testar_armazenamento(pasta_temporaria)
+testar_mes_atual()
+testar_rotas(pasta_temporaria)
+
+shutil.rmtree(pasta_temporaria)
+assert conteudo_da_pasta_dados() == antes
+print("Pasta dados/ sem alterações: ok")
 print()
 print("Todos os testes passaram.")

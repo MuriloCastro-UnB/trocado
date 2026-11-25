@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block titulo %}Metas{% endblock %}
+{% block conteudo %}
+<h1>Metas de economia</h1>
+
+{% if metas %}
+  {% for meta in metas %}
+    <div class="cartao meta">
+      <div class="meta-topo">
+        <h2>{{ meta.nome }}</h2>
+        <span class="prazo">até {{ meta.prazo | data }}</span>
+      </div>
+      <div class="barra"><div class="preenchido {% if meta.vencida %}estourou{% else %}ok{% endif %}" style="width: {{ [meta.porcentagem, 100] | min }}%"></div></div>
+      <p>{{ meta.guardado | reais }} de {{ meta.alvo | reais }} ({{ meta.porcentagem }}%)</p>
+
+      {% if meta.concluida %}
+        <p class="destaque ok">Meta concluída.</p>
+      {% elif meta.vencida %}
+        <p>Faltam {{ meta.falta | reais }}.</p>
+        <p class="destaque estourou">Prazo vencido.</p>
+      {% else %}
+        <p>Faltam {{ meta.falta | reais }}.</p>
+        <p class="destaque">Guarde {{ meta.por_mes | reais }} por mês ({{ meta.meses_restantes }} {% if meta.meses_restantes == 1 %}mês{% else %}meses{% endif %}).</p>
+      {% endif %}
+
+      {% if not meta.concluida %}
+        <form method="post" action="{{ url_for('guardar_dinheiro') }}" class="linha">
+          <input type="hidden" name="id" value="{{ meta.id }}">
+          <input type="text" name="valor" placeholder="Quanto guardou? Ex.: 50" inputmode="decimal">
+          <button type="submit">Guardar</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% else %}
+  <p class="vazio">Você ainda não tem metas.</p>
+{% endif %}
+
+<h2>Nova meta</h2>
+<form method="post" action="{{ url_for('nova_meta') }}" class="cartao formulario">
+  <label>Nome
+    <input type="text" name="nome" placeholder="Ex.: Viagem">
+  </label>
+  <label>Valor da meta (R$)
+    <input type="text" name="valor" placeholder="Ex.: 1.500,00" inputmode="decimal">
+  </label>
+  <label>Prazo
+    <input type="date" name="prazo">
+  </label>
+  <button type="submit">Criar meta</button>
+</form>
+{% endblock %}

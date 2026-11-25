@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block titulo %}Resumo{% endblock %}
+{% block conteudo %}
+<h1>Resumo de {{ mes | nome_mes }}</h1>
+
+<form method="get" action="{{ url_for('resumo') }}" class="linha">
+  <select name="mes">
+    {% for opcao in meses %}
+      <option value="{{ opcao }}" {% if opcao == mes %}selected{% endif %}>{{ opcao | nome_mes }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Ver mês</button>
+</form>
+
+<div class="totais">
+  <div class="cartao total">
+    <span>Entradas</span>
+    <strong class="entrada">{{ resumo.totais.entradas | reais }}</strong>
+  </div>
+  <div class="cartao total">
+    <span>Gastos</span>
+    <strong class="gasto">{{ resumo.totais.gastos | reais }}</strong>
+  </div>
+  <div class="cartao total">
+    <span>Saldo</span>
+    <strong {% if resumo.totais.saldo < 0 %}class="gasto"{% endif %}>{{ resumo.totais.saldo | reais }}</strong>
+  </div>
+</div>
+
+<h2>Gastos por categoria</h2>
+{% if resumo.gastos_por_categoria %}
+  <div class="tabela">
+    <table>
+      <tr><th>Categoria</th><th class="numero">Gasto</th></tr>
+      {% for categoria in categorias %}
+        {% if categoria in resumo.gastos_por_categoria %}
+          <tr>
+            <td>{{ categoria | categoria }}</td>
+            <td class="numero">{{ resumo.gastos_por_categoria[categoria] | reais }}</td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </table>
+  </div>
+{% else %}
+  <p class="vazio">Nenhum gasto neste mês.</p>
+{% endif %}
+
+<h2>Situação dos limites</h2>
+{% set limites = resumo.limites %}
+{% include "tabela_limites.html" %}
+{% endblock %}

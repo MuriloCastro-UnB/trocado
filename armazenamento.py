@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+from datetime import date
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
 ARQUIVO_DADOS = os.path.join(PASTA, "dados", "trocado.json")
@@ -22,12 +23,29 @@ def guardar_corrompido(caminho):
     return dados_vazios()
 
 
+def trazer_para_o_mes_atual(dados, hoje):
+    # os exemplos são de novembro de 2026: troca o ano e o mês pelos de hoje
+    # para o resumo e os limites não aparecerem vazios
+    for transacao in dados["transacoes"]:
+        dia = int(transacao["data"][8:10])
+        if dia > hoje.day:
+            dia = hoje.day
+        transacao["data"] = date(hoje.year, hoje.month, dia).isoformat()
+
+
+def criar_a_partir_do_exemplo(caminho, caminho_exemplo):
+    with open(caminho_exemplo, "r", encoding="utf-8") as arquivo:
+        dados = json.load(arquivo)
+    trazer_para_o_mes_atual(dados, date.today())
+    salvar_dados(dados, caminho)
+
+
 def carregar_dados(caminho=ARQUIVO_DADOS, caminho_exemplo=ARQUIVO_EXEMPLO):
-    # na primeira execução o arquivo de uso ainda não existe: copia o exemplo
+    # na primeira execução o arquivo de uso ainda não existe: cria a partir do exemplo
     if not os.path.exists(caminho):
         if not os.path.exists(caminho_exemplo):
             return dados_vazios()
-        shutil.copy(caminho_exemplo, caminho)
+        criar_a_partir_do_exemplo(caminho, caminho_exemplo)
 
     try:
         with open(caminho, "r", encoding="utf-8") as arquivo:

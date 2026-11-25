@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}{% endblock %} - Trocado</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <header>
+    <div class="topo">
+      <a class="logo" href="{{ url_for('chat') }}">Trocado</a>
+      <nav>
+        <a href="{{ url_for('chat') }}" {% if request.path == "/" %}class="atual"{% endif %}>Chat</a>
+        <a href="{{ url_for('transacoes') }}" {% if request.path == "/transacoes" %}class="atual"{% endif %}>Transações</a>
+        <a href="{{ url_for('limites') }}" {% if request.path == "/limites" %}class="atual"{% endif %}>Limites</a>
+        <a href="{{ url_for('metas') }}" {% if request.path == "/metas" %}class="atual"{% endif %}>Metas</a>
+        <a href="{{ url_for('resumo') }}" {% if request.path == "/resumo" %}class="atual"{% endif %}>Resumo</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {# mensagem e aviso chegam pelo endereço depois de um redirect; erro vem da rota #}
+    {% if request.args.get("mensagem") %}
+      <p class="caixa sucesso">{{ request.args.get("mensagem") }}</p>
+    {% endif %}
+    {% if request.args.get("aviso") %}
+      <p class="caixa alerta">{{ request.args.get("aviso") }}</p>
+    {% endif %}
+    {% if erro %}
+      <p class="caixa erro">{{ erro }}</p>
+    {% endif %}
+
+    {% block conteudo %}{% endblock %}
+  </main>
+</body>
+</html>
