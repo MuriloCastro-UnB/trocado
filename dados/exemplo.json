@@ -1,0 +1,29 @@
+{
+  "transacoes": [
+    {"id": 1, "tipo": "gasto", "valor": 45000, "categoria": "moradia", "descricao": "paguei 450 de aluguel", "data": "2026-11-01"},
+    {"id": 2, "tipo": "gasto", "valor": 3500, "categoria": "alimentacao", "descricao": "gastei 35 no ifood", "data": "2026-11-03"},
+    {"id": 3, "tipo": "gasto", "valor": 1250, "categoria": "transporte", "descricao": "paguei 12,50 de uber", "data": "2026-11-04"},
+    {"id": 4, "tipo": "entrada", "valor": 80000, "categoria": "entrada", "descricao": "recebi 800 da bolsa", "data": "2026-11-05"},
+    {"id": 5, "tipo": "gasto", "valor": 8790, "categoria": "alimentacao", "descricao": "gastei 87,90 no mercado", "data": "2026-11-06"},
+    {"id": 6, "tipo": "gasto", "valor": 3000, "categoria": "lazer", "descricao": "paguei 30 no cinema", "data": "2026-11-08"},
+    {"id": 7, "tipo": "entrada", "valor": 30000, "categoria": "entrada", "descricao": "ganhei 300 de mesada", "data": "2026-11-10"},
+    {"id": 8, "tipo": "gasto", "valor": 4500, "categoria": "educacao", "descricao": "comprei um livro de 45", "data": "2026-11-10"},
+    {"id": 9, "tipo": "gasto", "valor": 2000, "categoria": "transporte", "descricao": "gastei 20 de onibus", "data": "2026-11-12"},
+    {"id": 10, "tipo": "gasto", "valor": 520, "categoria": "alimentacao", "descricao": "paguei 5,20 no ru", "data": "2026-11-13"},
+    {"id": 11, "tipo": "gasto", "valor": 2390, "categoria": "saude", "descricao": "comprei remedio na farmacia por 23,90", "data": "2026-11-15"},
+    {"id": 12, "tipo": "gasto", "valor": 4200, "categoria": "alimentacao", "descricao": "gastei 42 na pizza", "data": "2026-11-17"},
+    {"id": 13, "tipo": "gasto", "valor": 1800, "categoria": "transporte", "descricao": "paguei 18 de uber", "data": "2026-11-20"},
+    {"id": 14, "tipo": "gasto", "valor": 8990, "categoria": "compras", "descricao": "comprei uma camisa de 89,90", "data": "2026-11-22"},
+    {"id": 15, "tipo": "gasto", "valor": 2800, "categoria": "alimentacao", "descricao": "gastei 28 no lanche", "data": "2026-11-24"}
+  ],
+  "limites": {
+    "alimentacao": 24000,
+    "transporte": 10000,
+    "lazer": 5000,
+    "compras": 8000
+  },
+  "metas": [
+    {"id": 1, "nome": "Viagem", "alvo": 150000, "guardado": 30000, "prazo": "2027-07-01"},
+    {"id": 2, "nome": "Notebook novo", "alvo": 300000, "guardado": 45000, "prazo": "2027-12-01"}
+  ]
+}
