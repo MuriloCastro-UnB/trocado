@@ -2,4 +2,3 @@
 __pycache__/
 .env
 dados/trocado.json
-dados/trocado_corrompido.json
