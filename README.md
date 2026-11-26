@@ -209,10 +209,11 @@ Eles usam uma pasta temporária e não mexem na pasta `dados/`. No final aparece
 
 Para conferir se o projeto funciona do zero, clonei o repositório numa pasta nova e segui este README desde a clonagem.
 
-- Data do teste:
-- Sistema operacional:
-- Versão do Python:
-- Pasta onde clonei:
-- Resultado de `python testes.py`:
-- Exemplo usado:
-- Resultado obtido:
+- Data do teste: 25/11/2026
+- Sistema operacional: Windows 11 Pro, versão 25H2, no PowerShell
+- Versão do Python: 3.15.2
+- Pasta onde clonei: uma pasta nova, separada da que eu uso para programar
+- Passos seguidos: os deste README, desde o `git clone`. No PowerShell, a ativação do ambiente virtual deu o erro de execução de scripts, e resolvi com o `Set-ExecutionPolicy` que está na seção Instalação. A instalação pelo `requirements.txt` funcionou com as mesmas versões.
+- Resultado de `python testes.py`: "Todos os testes passaram."
+- Exemplo usado: sem chave do Gemini, digitei "gastei 35 no ifood" no chat e confirmei.
+- Resultado obtido: o cartão mostrou "Entendi: gasto de R$ 35,00 em Alimentação, hoje. Confirmar?" com "entendido pelas regras". Depois de confirmar, apareceu "Registro salvo: gasto de R$ 35,00 em Alimentação, 25/11/2026." e o aviso de 97% do limite de Alimentação, igual ao exemplo de uso.
