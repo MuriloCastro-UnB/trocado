@@ -4,18 +4,32 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}{% endblock %} - Trocado</title>
+  <link rel="icon" href="{{ url_for('static', filename='icones/moeda.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
 </head>
 <body>
   <header>
     <div class="topo">
-      <a class="logo" href="{{ url_for('chat') }}">Trocado</a>
+      <a class="logo" href="{{ url_for('chat') }}">
+        <img src="{{ url_for('static', filename='icones/moeda.svg') }}" alt="">
+        Trocado
+      </a>
       <nav>
-        <a href="{{ url_for('chat') }}" {% if request.path == "/" %}class="atual"{% endif %}>Chat</a>
-        <a href="{{ url_for('transacoes') }}" {% if request.path == "/transacoes" %}class="atual"{% endif %}>Transações</a>
-        <a href="{{ url_for('limites') }}" {% if request.path == "/limites" %}class="atual"{% endif %}>Limites</a>
-        <a href="{{ url_for('metas') }}" {% if request.path == "/metas" %}class="atual"{% endif %}>Metas</a>
-        <a href="{{ url_for('resumo') }}" {% if request.path == "/resumo" %}class="atual"{% endif %}>Resumo</a>
+        <a href="{{ url_for('chat') }}" {% if request.path == "/" %}class="atual"{% endif %}>
+          <img src="{{ url_for('static', filename='icones/balao.svg') }}" alt="">Chat
+        </a>
+        <a href="{{ url_for('transacoes') }}" {% if request.path == "/transacoes" %}class="atual"{% endif %}>
+          <img src="{{ url_for('static', filename='icones/lista.svg') }}" alt="">Transações
+        </a>
+        <a href="{{ url_for('limites') }}" {% if request.path == "/limites" %}class="atual"{% endif %}>
+          <img src="{{ url_for('static', filename='icones/carteira.svg') }}" alt="">Limites
+        </a>
+        <a href="{{ url_for('metas') }}" {% if request.path == "/metas" %}class="atual"{% endif %}>
+          <img src="{{ url_for('static', filename='icones/alvo.svg') }}" alt="">Metas
+        </a>
+        <a href="{{ url_for('resumo') }}" {% if request.path == "/resumo" %}class="atual"{% endif %}>
+          <img src="{{ url_for('static', filename='icones/grafico.svg') }}" alt="">Resumo
+        </a>
       </nav>
     </div>
   </header>
@@ -26,10 +40,16 @@
       <p class="caixa sucesso">{{ request.args.get("mensagem") }}</p>
     {% endif %}
     {% if request.args.get("aviso") %}
-      <p class="caixa alerta">{{ request.args.get("aviso") }}</p>
+      <p class="caixa alerta">
+        <span class="selo pequeno alerta"><img src="{{ url_for('static', filename='icones/alerta.svg') }}" alt=""></span>
+        {{ request.args.get("aviso") }}
+      </p>
     {% endif %}
     {% if erro %}
-      <p class="caixa erro">{{ erro }}</p>
+      <p class="caixa erro">
+        <span class="selo pequeno gasto"><img src="{{ url_for('static', filename='icones/alerta.svg') }}" alt=""></span>
+        {{ erro }}
+      </p>
     {% endif %}
 
     {% block conteudo %}{% endblock %}

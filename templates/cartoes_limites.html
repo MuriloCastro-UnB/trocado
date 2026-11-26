@@ -1,0 +1,34 @@
+{# cartões dos limites, usados nas páginas de limites e de resumo #}
+{% if limites %}
+  <div class="grade">
+    {% for limite in limites %}
+      <div class="cartao limite">
+        <div class="cabeca">
+          {% if limite.situacao == "ok" %}
+            <span class="selo pequeno"><img src="{{ url_for('static', filename='icones/carteira.svg') }}" alt=""></span>
+          {% elif limite.situacao == "alerta" %}
+            <span class="selo pequeno alerta"><img src="{{ url_for('static', filename='icones/alerta.svg') }}" alt=""></span>
+          {% else %}
+            <span class="selo pequeno gasto"><img src="{{ url_for('static', filename='icones/alerta.svg') }}" alt=""></span>
+          {% endif %}
+          <span class="nome">{{ limite.nome }}</span>
+          <span class="porcentagem {{ limite.situacao }}">{{ limite.porcentagem }}%</span>
+        </div>
+        <div class="barra"><div class="preenchido {{ limite.situacao }}" style="width: {{ [limite.porcentagem, 100] | min }}%"></div></div>
+        <div class="numeros">
+          <span>Gasto <strong class="valor gasto">{{ limite.gasto | reais }}</strong></span>
+          <span>Limite <strong class="valor">{{ limite.limite | reais }}</strong></span>
+        </div>
+        {% if limite.situacao == "estourou" %}
+          <p class="situacao estourou">Passou do limite em {{ (limite.gasto - limite.limite) | reais }}.</p>
+        {% elif limite.situacao == "alerta" %}
+          <p class="situacao alerta">Cuidado: restam {{ (limite.limite - limite.gasto) | reais }}.</p>
+        {% else %}
+          <p class="situacao ok">Dentro do limite: restam {{ (limite.limite - limite.gasto) | reais }}.</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="vazio">Nenhum limite definido.</p>
+{% endif %}

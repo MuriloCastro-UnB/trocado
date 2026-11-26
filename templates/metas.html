@@ -1,39 +1,49 @@
 {% extends "base.html" %}
 {% block titulo %}Metas{% endblock %}
 {% block conteudo %}
-<h1>Metas de economia</h1>
+<h1 class="titulo">
+  <span class="selo"><img src="{{ url_for('static', filename='icones/alvo.svg') }}" alt=""></span>
+  Metas de economia
+</h1>
 
 {% if metas %}
-  {% for meta in metas %}
-    <div class="cartao meta">
-      <div class="meta-topo">
-        <h2>{{ meta.nome }}</h2>
-        <span class="prazo">até {{ meta.prazo | data }}</span>
+  <div class="grade">
+    {% for meta in metas %}
+      <div class="cartao meta">
+        <div class="cabeca">
+          <span class="selo {% if meta.vencida %}gasto{% endif %}"><img src="{{ url_for('static', filename='icones/alvo.svg') }}" alt=""></span>
+          <span class="nome">
+            {{ meta.nome }}
+            <span class="prazo">até {{ meta.prazo | data }}</span>
+          </span>
+          <span class="porcentagem {% if meta.vencida %}estourou{% endif %}">{{ meta.porcentagem }}%</span>
+        </div>
+        <div class="barra"><div class="preenchido {% if meta.vencida %}estourou{% endif %}" style="width: {{ [meta.porcentagem, 100] | min }}%"></div></div>
+        <div class="numeros">
+          <span>Guardado <strong class="valor entrada">{{ meta.guardado | reais }}</strong></span>
+          <span>Meta <strong class="valor">{{ meta.alvo | reais }}</strong></span>
+        </div>
+
+        {% if meta.concluida %}
+          <p class="destaque">Meta concluída.</p>
+        {% elif meta.vencida %}
+          <p class="destaque estourou">Prazo vencido. Faltam {{ meta.falta | reais }}.</p>
+        {% else %}
+          <p class="destaque">Faltam {{ meta.falta | reais }}: guarde {{ meta.por_mes | reais }} por mês ({{ meta.meses_restantes }} {% if meta.meses_restantes == 1 %}mês{% else %}meses{% endif %}).</p>
+        {% endif %}
+
+        {% if not meta.concluida %}
+          <form method="post" action="{{ url_for('guardar_dinheiro') }}" class="linha">
+            <input type="hidden" name="id" value="{{ meta.id }}">
+            <input type="text" name="valor" placeholder="Quanto guardou? Ex.: 50" inputmode="decimal">
+            <button type="submit">Guardar</button>
+          </form>
+        {% endif %}
       </div>
-      <div class="barra"><div class="preenchido {% if meta.vencida %}estourou{% else %}ok{% endif %}" style="width: {{ [meta.porcentagem, 100] | min }}%"></div></div>
-      <p>{{ meta.guardado | reais }} de {{ meta.alvo | reais }} ({{ meta.porcentagem }}%)</p>
-
-      {% if meta.concluida %}
-        <p class="destaque ok">Meta concluída.</p>
-      {% elif meta.vencida %}
-        <p>Faltam {{ meta.falta | reais }}.</p>
-        <p class="destaque estourou">Prazo vencido.</p>
-      {% else %}
-        <p>Faltam {{ meta.falta | reais }}.</p>
-        <p class="destaque">Guarde {{ meta.por_mes | reais }} por mês ({{ meta.meses_restantes }} {% if meta.meses_restantes == 1 %}mês{% else %}meses{% endif %}).</p>
-      {% endif %}
-
-      {% if not meta.concluida %}
-        <form method="post" action="{{ url_for('guardar_dinheiro') }}" class="linha">
-          <input type="hidden" name="id" value="{{ meta.id }}">
-          <input type="text" name="valor" placeholder="Quanto guardou? Ex.: 50" inputmode="decimal">
-          <button type="submit">Guardar</button>
-        </form>
-      {% endif %}
-    </div>
-  {% endfor %}
+    {% endfor %}
+  </div>
 {% else %}
-  <p class="vazio">Você ainda não tem metas.</p>
+  <p class="vazio">Você ainda não tem metas. Crie a primeira abaixo.</p>
 {% endif %}
 
 <h2>Nova meta</h2>

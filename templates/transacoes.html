@@ -1,28 +1,23 @@
 {% extends "base.html" %}
 {% block titulo %}Transações{% endblock %}
 {% block conteudo %}
-<h1>Transações de {{ mes | nome_mes }}</h1>
+<h1 class="titulo">
+  <span class="selo"><img src="{{ url_for('static', filename='icones/lista.svg') }}" alt=""></span>
+  Transações de {{ mes | nome_mes }}
+</h1>
 
 {% if transacoes %}
-  <div class="tabela">
-    <table>
-      <tr><th>Data</th><th>Descrição</th><th class="some-no-celular">Categoria</th><th class="numero">Valor</th><th></th></tr>
-      {% for transacao in transacoes %}
-        <tr>
-          <td>{{ transacao.data | data }}</td>
-          <td>{{ transacao.descricao }}</td>
-          <td class="some-no-celular">{{ transacao.categoria | categoria }}</td>
-          <td class="numero {{ transacao.tipo }}">{% if transacao.tipo == "entrada" %}+{% else %}-{% endif %} {{ transacao.valor | reais }}</td>
-          <td>
-            <form method="post" action="{{ url_for('excluir') }}">
-              <input type="hidden" name="id" value="{{ transacao.id }}">
-              <button type="submit" class="pequeno perigo">Excluir</button>
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-    </table>
-  </div>
+  <ul class="movimentos">
+    {% for transacao in transacoes %}
+      <li class="movimento">
+        {% include "movimento.html" %}
+        <form method="post" action="{{ url_for('excluir') }}">
+          <input type="hidden" name="id" value="{{ transacao.id }}">
+          <button type="submit" class="perigo">Excluir</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
 {% else %}
   <p class="vazio">Nenhum registro neste mês. Use o chat para registrar um gasto ou uma entrada.</p>
 {% endif %}

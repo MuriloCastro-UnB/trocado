@@ -1,0 +1,13 @@
+{# uma linha da lista de transações: seta, descrição, categoria, data e valor #}
+<span class="selo pequeno {{ transacao.tipo }}">
+  {% if transacao.tipo == "entrada" %}
+    <img src="{{ url_for('static', filename='icones/seta-entrada.svg') }}" alt="Entrada">
+  {% else %}
+    <img src="{{ url_for('static', filename='icones/seta-saida.svg') }}" alt="Gasto">
+  {% endif %}
+</span>
+<div class="info">
+  <div class="descricao">{{ transacao.descricao }}</div>
+  <div class="detalhe"><span>{{ transacao.categoria | categoria }}</span><span>{{ transacao.data | data }}</span></div>
+</div>
+<span class="valor {{ transacao.tipo }}">{% if transacao.tipo == "entrada" %}+{% else %}-{% endif %} {{ transacao.valor | reais }}</span>
