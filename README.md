@@ -2,7 +2,7 @@
 
 ## Descrição
 
-Trabalho final de Computação para Engenharia (CPE), Turma A, 2º semestre de 2026, na UnB.
+Trabalho final de Computação para Engenharia (ENE0034), 2º semestre de 2026, na UnB.
 
 - Aluno: Murilo Silva Braga de Castro
 - Matrícula: 262006172
