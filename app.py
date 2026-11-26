@@ -1,15 +1,26 @@
+import os
 from datetime import date
 
+from dotenv import load_dotenv
 from flask import Flask, redirect, render_template, request, url_for
 
 import armazenamento
 import financas
 import interpretador
 
+# lê o arquivo .env (se existir) e coloca as configurações nas variáveis de ambiente
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
 app = Flask(__name__)
 
 # arquivo onde os dados ficam; os testes trocam por um arquivo temporário
 app.config["ARQUIVO_DADOS"] = armazenamento.ARQUIVO_DADOS
+
+# chave e modelo do Gemini; sem chave, o app usa só as regras
+app.config["GEMINI_CHAVE"] = os.getenv("GEMINI_API_KEY", "").strip()
+app.config["GEMINI_MODELO"] = os.getenv("GEMINI_MODELO", "").strip()
+if app.config["GEMINI_MODELO"] == "":
+    app.config["GEMINI_MODELO"] = interpretador.MODELO_PADRAO
 
 # funções que as páginas HTML podem usar, como {{ valor | reais }}
 app.jinja_env.filters["reais"] = financas.formatar_reais
@@ -85,7 +96,7 @@ def chat():
     if resposta is not None:
         return mostrar_chat(frase=frase, resposta=resposta)
 
-    interpretacao = interpretador.interpretar_frase(frase, hoje)
+    interpretacao = interpretador.interpretar(frase, hoje, app.config["GEMINI_CHAVE"], app.config["GEMINI_MODELO"])
     if "erro" in interpretacao:
         return mostrar_chat(frase=frase, erro=interpretacao["erro"])
 
@@ -286,4 +297,9 @@ def resumo():
 
 
 if __name__ == "__main__":
+    # avisa no terminal qual interpretador está ligado, sem nunca mostrar a chave
+    if app.config["GEMINI_CHAVE"] != "":
+        print("Gemini ligado, modelo " + app.config["GEMINI_MODELO"] + ". Se ele falhar, uso as regras.")
+    else:
+        print("Sem chave do Gemini no .env: as frases serão entendidas pelas regras.")
     app.run(debug=False)

@@ -414,6 +414,12 @@ label select {
   color: var(--texto-fraco);
 }
 
+.confirmacao p.origem {
+  margin: -10px 0 16px;
+  font-size: 12px;
+  color: #8a978f;
+}
+
 .envio {
   display: flex;
   gap: 8px;

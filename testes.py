@@ -3,6 +3,8 @@ import shutil
 import tempfile
 from datetime import date, timedelta
 
+import requests
+
 import armazenamento
 import financas
 import interpretador
@@ -289,6 +291,8 @@ def testar_rotas(pasta_temporaria):
     arquivo = os.path.join(pasta_temporaria, "trocado.json")
     app.config["ARQUIVO_DADOS"] = arquivo
     app.config["TESTING"] = True
+    # sem chave, mesmo que exista um .env com chave nesta pasta
+    app.config["GEMINI_CHAVE"] = ""
     cliente = app.test_client()
     hoje = date.today().isoformat()
 
@@ -304,7 +308,22 @@ def testar_rotas(pasta_temporaria):
     texto = pagina(cliente.post("/", data={"mensagem": "gastei 35 no ifood"}))
     assert "Entendi: gasto de R$ 35,00 em Alimentação, hoje. Confirmar?" in texto
     assert 'name="valor" value="3500"' in texto
+    assert "entendido pelas regras" in texto
     assert len(armazenamento.carregar_dados(arquivo)["transacoes"]) == 15
+
+    # com uma chave falsa e um Gemini falso, o cartão diz que foi o Gemini
+    funcao_verdadeira = interpretador.perguntar_ao_gemini
+
+    def gemini_falso(frase, hoje, chave, modelo):
+        return '{"tipo": "gasto", "valor": 35, "categoria": "alimentacao", "data": "' + hoje.isoformat() + '"}'
+
+    interpretador.perguntar_ao_gemini = gemini_falso
+    app.config["GEMINI_CHAVE"] = "chave-falsa"
+    texto = pagina(cliente.post("/", data={"mensagem": "gastei 35 no ifood"}))
+    assert "entendido pelo Gemini" in texto
+    assert "chave-falsa" not in texto
+    interpretador.perguntar_ao_gemini = funcao_verdadeira
+    app.config["GEMINI_CHAVE"] = ""
 
     # confirmar trocando a categoria para lazer: lazer tinha 30 de 50, agora 65 de 50
     formulario = {"acao": "confirmar", "tipo": "gasto", "valor": "3500", "categoria": "lazer",
@@ -417,6 +436,85 @@ def testar_rotas(pasta_temporaria):
     print("Rotas: ok")
 
 
+def testar_validacao_gemini():
+    frase = "gastei 35,90 no ifood"
+
+    # JSON certo: o valor em reais vira centavos
+    texto = '{"tipo": "gasto", "valor": 35.9, "categoria": "alimentacao", "data": "2026-11-25"}'
+    assert interpretador.validar_resposta_gemini(texto, frase) == {
+        "tipo": "gasto", "valor": 3590, "categoria": "alimentacao", "data": "2026-11-25", "descricao": frase}
+    texto = '{"tipo": "gasto", "valor": 19.99, "categoria": "lazer", "data": "2026-11-24"}'
+    assert interpretador.validar_resposta_gemini(texto, frase)["valor"] == 1999
+    # entrada sempre fica com a categoria "entrada"
+    texto = '{"tipo": "entrada", "valor": 800, "categoria": "outros", "data": "2026-11-25"}'
+    entrada = interpretador.validar_resposta_gemini(texto, "recebi 800 da bolsa")
+    assert entrada["valor"] == 80000
+    assert entrada["categoria"] == "entrada"
+
+    # respostas erradas: devolve None
+    errados = [
+        '{"tipo": "gasto", "valor": ',
+        "não é json",
+        "[1, 2, 3]",
+        '{"tipo": "gasto", "valor": 0, "categoria": "lazer", "data": "2026-11-25"}',
+        '{"tipo": "gasto", "valor": -10, "categoria": "lazer", "data": "2026-11-25"}',
+        '{"tipo": "gasto", "valor": 0.001, "categoria": "lazer", "data": "2026-11-25"}',
+        '{"tipo": "gasto", "valor": "35", "categoria": "lazer", "data": "2026-11-25"}',
+        '{"tipo": "gasto", "valor": true, "categoria": "lazer", "data": "2026-11-25"}',
+        '{"tipo": "gasto", "valor": 35, "categoria": "comida", "data": "2026-11-25"}',
+        '{"tipo": "gasto", "valor": 35, "data": "2026-11-25"}',
+        '{"tipo": "transferencia", "valor": 35, "categoria": "lazer", "data": "2026-11-25"}',
+        '{"tipo": "gasto", "valor": 35, "categoria": "lazer", "data": "25/11/2026"}',
+        '{"tipo": "gasto", "valor": 35, "categoria": "lazer", "data": "2026-02-30"}',
+        '{"tipo": "gasto", "valor": 35, "categoria": "lazer"}',
+    ]
+    for texto in errados:
+        if interpretador.validar_resposta_gemini(texto, frase) is not None:
+            print("Deveria ser inválido:", texto)
+        assert interpretador.validar_resposta_gemini(texto, frase) is None
+    print("Validação do Gemini: ok")
+
+
+def testar_escolha_do_interpretador():
+    # sem chave: usa as regras e não chama a internet
+    resultado = interpretador.interpretar("gastei 35 no ifood", HOJE, "", interpretador.MODELO_PADRAO)
+    assert resultado["origem"] == "regras"
+    assert resultado["valor"] == 3500
+    assert resultado["categoria"] == "alimentacao"
+    assert interpretador.interpretar("gastei no mercado", HOJE, "", "")["origem"] == "regras"
+
+    # com chave, troco a função que usa a internet por funções falsas
+    funcao_verdadeira = interpretador.perguntar_ao_gemini
+
+    def gemini_certo(frase, hoje, chave, modelo):
+        return '{"tipo": "gasto", "valor": 50, "categoria": "compras", "data": "2026-11-25"}'
+
+    def gemini_quebrado(frase, hoje, chave, modelo):
+        return '{"tipo": "gasto", "valor": '
+
+    def gemini_sem_internet(frase, hoje, chave, modelo):
+        raise requests.ConnectionError("sem internet")
+
+    interpretador.perguntar_ao_gemini = gemini_certo
+    resultado = interpretador.interpretar("comprei um presente de 50", HOJE, "chave-falsa", "modelo")
+    assert resultado["origem"] == "gemini"
+    assert resultado["valor"] == 5000
+
+    # resposta quebrada ou erro de internet: volta para as regras
+    interpretador.perguntar_ao_gemini = gemini_quebrado
+    resultado = interpretador.interpretar("gastei 35 no ifood", HOJE, "chave-falsa", "modelo")
+    assert resultado["origem"] == "regras"
+    assert resultado["valor"] == 3500
+
+    interpretador.perguntar_ao_gemini = gemini_sem_internet
+    resultado = interpretador.interpretar("gastei 35 no ifood", HOJE, "chave-falsa", "modelo")
+    assert resultado["origem"] == "regras"
+    assert resultado["categoria"] == "alimentacao"
+
+    interpretador.perguntar_ao_gemini = funcao_verdadeira
+    print("Escolha entre Gemini e regras: ok")
+
+
 def conteudo_da_pasta_dados():
     # nome e conteúdo de cada arquivo, para ver se os testes mudaram alguma coisa
     pasta = os.path.join(armazenamento.PASTA, "dados")
@@ -441,6 +539,8 @@ testar_metas()
 testar_alteracoes()
 testar_armazenamento(pasta_temporaria)
 testar_mes_atual()
+testar_validacao_gemini()
+testar_escolha_do_interpretador()
 testar_rotas(pasta_temporaria)
 
 shutil.rmtree(pasta_temporaria)

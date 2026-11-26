@@ -1,6 +1,12 @@
-from datetime import timedelta
+import json
+from datetime import date, timedelta
+
+import requests
 
 import financas
+
+# modelo do Gemini usado quando o .env não diz outro (está no plano gratuito)
+MODELO_PADRAO = "gemini-3.5-flash-lite"
 
 ACENTOS = {"á": "a", "à": "a", "â": "a", "ã": "a", "é": "e", "ê": "e", "í": "i",
            "ó": "o", "ô": "o", "õ": "o", "ú": "u", "ü": "u", "ç": "c"}
@@ -167,6 +173,99 @@ def interpretar_frase(frase, hoje):
         "data": data.isoformat(),
         "descricao": frase.strip(),
     }
+
+
+def montar_pedido(frase, hoje):
+    # o texto que vai para o Gemini, com a data de hoje e as categorias
+    return ("Você lê frases de um estudante brasileiro sobre o próprio dinheiro.\n"
+            "Hoje é " + hoje.isoformat() + ".\n"
+            "Categorias de gasto: " + ", ".join(financas.CATEGORIAS_GASTO) + ".\n"
+            "Responda somente com um JSON neste formato:\n"
+            '{"tipo": "gasto" ou "entrada", "valor": valor em reais como número (ex.: 12.5), '
+            '"categoria": uma das categorias de gasto, ou "entrada" se for entrada, '
+            '"data": "AAAA-MM-DD"}\n'
+            "Se a frase não disser a data, use a data de hoje.\n"
+            "Frase: " + frase)
+
+
+def perguntar_ao_gemini(frase, hoje, chave, modelo):
+    # manda a frase para o Gemini e devolve o texto da resposta
+    # se der algum problema (internet, chave, limite de uso), o requests gera um erro
+    endereco = "https://generativelanguage.googleapis.com/v1beta/models/" + modelo + ":generateContent"
+    corpo = {
+        "contents": [{"parts": [{"text": montar_pedido(frase, hoje)}]}],
+        "generationConfig": {"responseMimeType": "application/json"},
+    }
+    # a chave vai no cabeçalho, e não no endereço, para não aparecer em mensagens de erro
+    resposta = requests.post(endereco, headers={"x-goog-api-key": chave}, json=corpo, timeout=10)
+    resposta.raise_for_status()
+    dados = resposta.json()
+    return dados["candidates"][0]["content"]["parts"][0]["text"]
+
+
+def validar_resposta_gemini(texto, frase):
+    # confere o JSON que o Gemini mandou; devolve None se tiver qualquer coisa errada
+    try:
+        resposta = json.loads(texto)
+    except ValueError:
+        return None
+    if type(resposta) != dict:
+        return None
+
+    tipo = resposta.get("tipo")
+    if tipo != "gasto" and tipo != "entrada":
+        return None
+
+    valor = resposta.get("valor")
+    if type(valor) != int and type(valor) != float:
+        return None
+    # o valor precisa ser maior que zero (e no máximo 10 milhões de reais)
+    if not (valor > 0 and valor <= 10000000):
+        return None
+    centavos = round(valor * 100)
+    if centavos <= 0:
+        return None
+
+    categoria = resposta.get("categoria")
+    if tipo == "entrada":
+        categoria = "entrada"
+    elif categoria not in financas.CATEGORIAS_GASTO:
+        return None
+
+    data = resposta.get("data")
+    if type(data) != str or len(data) != 10:
+        return None
+    try:
+        date.fromisoformat(data)
+    except ValueError:
+        return None
+
+    return {
+        "tipo": tipo,
+        "valor": centavos,
+        "categoria": categoria,
+        "data": data,
+        "descricao": frase.strip(),
+    }
+
+
+def interpretar(frase, hoje, chave, modelo):
+    # se tiver chave, tenta o Gemini; sem chave ou se der qualquer erro, usa as regras
+    if chave != "":
+        try:
+            texto = perguntar_ao_gemini(frase, hoje, chave, modelo)
+            resultado = validar_resposta_gemini(texto, frase)
+            if resultado is not None:
+                resultado["origem"] = "gemini"
+                return resultado
+            print("O Gemini mandou uma resposta inválida. Usando as regras.")
+        except Exception as erro:
+            # mostra só o tipo do erro, para a chave nunca aparecer no terminal
+            print("Não consegui usar o Gemini (" + type(erro).__name__ + "). Usando as regras.")
+
+    resultado = interpretar_frase(frase, hoje)
+    resultado["origem"] = "regras"
+    return resultado
 
 
 def texto_confirmacao(interpretacao, hoje):
